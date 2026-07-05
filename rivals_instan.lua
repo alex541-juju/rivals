@@ -17,7 +17,7 @@ local function instanceShowLoadingNotification()
     label.Font = Enum.Font.GothamMedium
     label.TextSize = 22
     label.TextColor3 = Color3.fromRGB(0, 200, 255)
-    label.Text = "loading."
+    label.Text = "Loading."
     label.Parent = gui
     local accum = 0
     local dotIndex = 1
@@ -26,7 +26,7 @@ local function instanceShowLoadingNotification()
         if accum < 0.35 then return end
         accum = 0
         dotIndex = dotIndex % 3 + 1
-        label.Text = "loading" .. string.rep(".", dotIndex)
+        label.Text = "Loading" .. string.rep(".", dotIndex)
     end)
     return function()
         if conn then conn:Disconnect() conn = nil end
@@ -89,6 +89,79 @@ local function instanceHideErrorPromptsStep()
 end
 
 local function instanceRunLoadingBootstrap()
+
+-- ============================================
+-- MOBILE SUPPORT PATCH
+-- ============================================
+local _UserInputService = game:GetService("UserInputService")
+local _GuiService = game:GetService("GuiService")
+local _Players = game:GetService("Players")
+
+-- Mobile detection
+local IS_MOBILE = _UserInputService.TouchEnabled and not _UserInputService.KeyboardEnabled
+local SCREEN_SIZE = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
+local IS_SMALL_SCREEN = SCREEN_SIZE.X < 800 or SCREEN_SIZE.Y < 600
+local MOBILE_SCALE = 1
+if IS_MOBILE or IS_SMALL_SCREEN then
+    local scaleX = math.clamp(SCREEN_SIZE.X / 750, 0.55, 1)
+    local scaleY = math.clamp(SCREEN_SIZE.Y / 650, 0.55, 1)
+    MOBILE_SCALE = math.min(scaleX, scaleY)
+end
+
+-- Touch state
+local MobileTouchState = {
+    Held = false,
+    Position = Vector2.new(0, 0),
+    StartPosition = Vector2.new(0, 0),
+    StartTime = 0,
+    Input = nil,
+}
+
+_UserInputService.InputBegan:Connect(function(Input, gameProcessed)
+    if gameProcessed then return end
+    if Input.UserInputType == Enum.UserInputType.Touch then
+        MobileTouchState.Held = true
+        MobileTouchState.Position = Input.Position
+        MobileTouchState.StartPosition = Input.Position
+        MobileTouchState.StartTime = tick()
+        MobileTouchState.Input = Input
+    end
+end)
+
+_UserInputService.InputChanged:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.Touch then
+        MobileTouchState.Position = Input.Position
+    end
+end)
+
+_UserInputService.InputEnded:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.Touch then
+        MobileTouchState.Held = false
+        MobileTouchState.Input = nil
+    end
+end)
+
+-- Global helpers
+getgenv().InstanceIsPrimaryHeld = function()
+    return _UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or MobileTouchState.Held
+end
+
+getgenv().InstanceGetMousePos = function()
+    if MobileTouchState.Held then
+        return MobileTouchState.Position
+    end
+    local mouse = _Players.LocalPlayer and _Players.LocalPlayer:GetMouse()
+    if mouse then
+        return Vector2.new(mouse.X, mouse.Y)
+    end
+    return Vector2.new(0, 0)
+end
+
+-- ============================================
+-- END MOBILE PATCH
+-- ============================================
+
+
     local runService = game:GetService("RunService")
     local dismissLoading = instanceShowLoadingNotification()
     local hideErrors = true
@@ -240,7 +313,7 @@ Mouse = setmetatable({}, {
     end;
 });
 
-local function IsPrimaryHeld()
+local function InstanceIsPrimaryHeld()
     return InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or TouchHeld;
 end;
 
@@ -273,6 +346,12 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
 ScreenGui.DisplayOrder = 2147483646;
 ScreenGui.IgnoreGuiInset = true;
 ScreenGui.Parent = CoreGui;
+
+if (IS_MOBILE or IS_SMALL_SCREEN) then
+    local _uis = Instance.new("UIScale")
+    _uis.Scale = MOBILE_SCALE
+    _uis.Parent = ScreenGui
+end
 
 local Toggles = {};
 local Options = {};
@@ -527,12 +606,12 @@ function Library:AddToolTip(InfoStr, HoverInstance)
 
         IsHovering = true
 
-        Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
+        local _mp = InstanceGetMousePos(); Tooltip.Position = UDim2.fromOffset(_mp.X + 15, _mp.Y + 12)
         Tooltip.Visible = true
 
         while IsHovering do
             RunService.Heartbeat:Wait()
-            Tooltip.Position = UDim2.fromOffset(Mouse.X + 15, Mouse.Y + 12)
+            local _mp = InstanceGetMousePos(); Tooltip.Position = UDim2.fromOffset(_mp.X + 15, _mp.Y + 12)
         end
     end)
 
@@ -580,8 +659,8 @@ function Library:MouseIsOverOpenedFrame()
     for Frame, _ in next, Library.OpenedFrames do
         local AbsPos, AbsSize = Frame.AbsolutePosition, Frame.AbsoluteSize;
 
-        if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X
-            and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
+        if InstanceGetMousePos().X >= AbsPos.X and InstanceGetMousePos().X <= AbsPos.X + AbsSize.X
+            and InstanceGetMousePos().Y >= AbsPos.Y and InstanceGetMousePos().Y <= AbsPos.Y + AbsSize.Y then
 
             return true;
         end;
@@ -591,8 +670,8 @@ end;
 function Library:IsMouseOverFrame(Frame)
     local AbsPos, AbsSize = Frame.AbsolutePosition, Frame.AbsoluteSize;
 
-    if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X
-        and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
+    if InstanceGetMousePos().X >= AbsPos.X and InstanceGetMousePos().X <= AbsPos.X + AbsSize.X
+        and InstanceGetMousePos().Y >= AbsPos.Y and InstanceGetMousePos().Y <= AbsPos.Y + AbsSize.Y then
 
         return true;
     end;
@@ -741,7 +820,7 @@ do
 local DisplayFrame = Library:Create('Frame', {
     BackgroundColor3 = Color3.new(0, 0, 0);
     BorderColor3 = Library.OutlineColor;
-    Size = UDim2.new(0, 28, 0, 14);
+    Size = UDim2.new(0, math.floor(IS_MOBILE and 40 or 28), 0, math.floor(IS_MOBILE and 22 or 14));
     ZIndex = 9;
     Parent = ToggleLabel;
 });
@@ -785,7 +864,7 @@ local DisplayInner = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.fromOffset(DisplayFrame.AbsolutePosition.X, DisplayFrame.AbsolutePosition.Y + 18),
-            Size = UDim2.fromOffset(230, 280);
+            Size = UDim2.fromOffset(math.floor(IS_MOBILE and 280 or 230), math.floor(IS_MOBILE and 340 or 280));
             Visible = false;
             ZIndex = 15;
             Parent = ScreenGui,
@@ -817,7 +896,7 @@ local DisplayInner = Library:Create('Frame', {
         local SatVibMapOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.new(0, 4, 0, 25);
-            Size = UDim2.new(0, 200, 0, 200);
+            Size = UDim2.new(0, math.floor(IS_MOBILE and 240 or 200), 0, math.floor(IS_MOBILE and 240 or 200));
             ZIndex = 17;
             Parent = PickerFrameInner;
         });
@@ -861,7 +940,7 @@ local DisplayInner = Library:Create('Frame', {
         local HueSelectorOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.new(0, 208, 0, 25);
-            Size = UDim2.new(0, 15, 0, 200);
+            Size = UDim2.new(0, math.floor(IS_MOBILE and 22 or 15), 0, math.floor(IS_MOBILE and 240 or 200));
             ZIndex = 17;
             Parent = PickerFrameInner;
         });
@@ -1005,10 +1084,10 @@ local function CreateRGBSlider(Name, YPos, ColorChannel)
 
     SliderInner.InputBegan:Connect(function(Input)
         if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-            while IsPrimaryHeld() do
+            while InstanceIsPrimaryHeld() do
                 local MinX = SliderInner.AbsolutePosition.X;
                 local MaxX = MinX + SliderInner.AbsoluteSize.X;
-                local MouseX = math.clamp(Mouse.X, MinX, MaxX);
+                local MouseX = math.clamp(InstanceGetMousePos().X, MinX, MaxX);
                 local Value = math.floor(((MouseX - MinX) / (MaxX - MinX)) * 255);
                 
                 local R, G, B = math.floor(ColorPicker.Value.R * 255), 
@@ -1043,7 +1122,7 @@ CreateRGBSlider('B', 40, 'B');
         TransparencyBoxOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.fromOffset(4, 228);
-            Size = UDim2.new(0, 200, 0, 15);
+            Size = UDim2.new(0, math.floor(IS_MOBILE and 240 or 200), 0, math.floor(IS_MOBILE and 22 or 15));
             ZIndex = 19;
             Parent = PickerFrameInner;
         });
@@ -1251,7 +1330,7 @@ Library:OnHighlight(PlusClickFrame, PlusButton,
 
                 local Button = Library:CreateLabel({
                     Active = false;
-                    Size = UDim2.new(1, 0, 0, 15);
+                    Size = UDim2.new(1, 0, 0, math.floor(IS_MOBILE and 28 or 15));
                     TextSize = 13;
                     Text = Str;
                     ZIndex = 16;
@@ -1402,14 +1481,14 @@ Library:Create(DisplayInner, {
 
         SatVibMap.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-                while IsPrimaryHeld() do
+                while InstanceIsPrimaryHeld() do
                     local MinX = SatVibMap.AbsolutePosition.X;
                     local MaxX = MinX + SatVibMap.AbsoluteSize.X;
-                    local MouseX = math.clamp(Mouse.X, MinX, MaxX);
+                    local MouseX = math.clamp(InstanceGetMousePos().X, MinX, MaxX);
 
                     local MinY = SatVibMap.AbsolutePosition.Y;
                     local MaxY = MinY + SatVibMap.AbsoluteSize.Y;
-                    local MouseY = math.clamp(Mouse.Y, MinY, MaxY);
+                    local MouseY = math.clamp(InstanceGetMousePos().Y, MinY, MaxY);
 
                     ColorPicker.Sat = (MouseX - MinX) / (MaxX - MinX);
                     ColorPicker.Vib = 1 - ((MouseY - MinY) / (MaxY - MinY));
@@ -1424,10 +1503,11 @@ Library:Create(DisplayInner, {
 
         HueSelectorInner.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-                while IsPrimaryHeld() do
+                while InstanceIsPrimaryHeld() do
                     local MinY = HueSelectorInner.AbsolutePosition.Y;
                     local MaxY = MinY + HueSelectorInner.AbsoluteSize.Y;
-                    local MouseY = math.clamp(Mouse.Y, MinY, MaxY);
+                    local mousePos = InstanceGetMousePos();
+                    local MouseY = math.clamp(mousePos.Y, MinY, MaxY);
 
                     ColorPicker.Hue = ((MouseY - MinY) / (MaxY - MinY));
                     ColorPicker:Display();
@@ -1455,10 +1535,11 @@ Library:Create(DisplayInner, {
 
         TransparencyBoxInner.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-                while IsPrimaryHeld() do
+                while InstanceIsPrimaryHeld() do
                     local MinX = TransparencyBoxInner.AbsolutePosition.X;
                     local MaxX = MinX + TransparencyBoxInner.AbsoluteSize.X;
-                    local MouseX = math.clamp(Mouse.X, MinX, MaxX);
+                    local mousePos = InstanceGetMousePos();
+                    local MouseX = math.clamp(mousePos.X, MinX, MaxX);
 
                     ColorPicker.Transparency = 1 - ((MouseX - MinX) / (MaxX - MinX));
 
@@ -1475,8 +1556,8 @@ Library:Create(DisplayInner, {
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
                 local AbsPos, AbsSize = PickerFrameOuter.AbsolutePosition, PickerFrameOuter.AbsoluteSize;
 
-                if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
-                    or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
+                if InstanceGetMousePos().X < AbsPos.X or InstanceGetMousePos().X > AbsPos.X + AbsSize.X
+                    or InstanceGetMousePos().Y < (AbsPos.Y - 20 - 1) or InstanceGetMousePos().Y > AbsPos.Y + AbsSize.Y then
 
                     ColorPicker:Hide();
                 end;
@@ -1532,7 +1613,7 @@ Library:Create(DisplayInner, {
         local PickOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(0, 28, 0, 15);
+            Size = UDim2.new(0, math.floor(IS_MOBILE and 44 or 28), 0, math.floor(IS_MOBILE and 26 or 15));
             ZIndex = 9;
             Parent = ToggleLabel;
         });
@@ -1565,7 +1646,7 @@ Library:Create(DisplayInner, {
         local ModeSelectOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
-            Size = UDim2.new(0, 60, 0, 47);
+            Size = UDim2.new(0, math.floor(IS_MOBILE and 90 or 60), 0, math.floor(IS_MOBILE and 70 or 47));
             Visible = false;
             ZIndex = 14;
             Parent = ScreenGui;
@@ -1612,7 +1693,7 @@ Library:Create(DisplayInner, {
 
             local Label = Library:CreateLabel({
                 Active = false;
-                Size = UDim2.new(1, 0, 0, 15);
+                Size = UDim2.new(1, 0, 0, math.floor(IS_MOBILE and 26 or 15));
                 TextSize = 13;
                 Text = Mode;
                 ZIndex = 16;
@@ -1778,7 +1859,7 @@ Library:Create(DisplayInner, {
             end
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
                 local AbsPos, AbsSize = ModeSelectOuter.AbsolutePosition, ModeSelectOuter.AbsoluteSize
-                if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X or Mouse.Y < AbsPos.Y - 21 or Mouse.Y > AbsPos.Y + AbsSize.Y then
+                if InstanceGetMousePos().X < AbsPos.X or InstanceGetMousePos().X > AbsPos.X + AbsSize.X or InstanceGetMousePos().Y < AbsPos.Y - 21 or InstanceGetMousePos().Y > AbsPos.Y + AbsSize.Y then
                     ModeSelectOuter.Visible = false
                 end
             end
@@ -1898,7 +1979,7 @@ do
             local Outer = Library:Create('Frame', {
                 BackgroundColor3 = Color3.new(0, 0, 0);
                 BorderColor3 = Color3.new(0, 0, 0);
-                Size = UDim2.new(1, -4, 0, 20);
+                Size = UDim2.new(1, -4, 0, math.floor(IS_MOBILE and 36 or 20));
                 ZIndex = 5;
             });
 
@@ -2120,7 +2201,7 @@ function Button:AddButton(...)
         local TextBoxOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(1, -4, 0, 20);
+            Size = UDim2.new(1, -4, 0, math.floor(IS_MOBILE and 36 or 20));
             ZIndex = 5;
             Parent = Container;
         });
@@ -2286,7 +2367,7 @@ function Button:AddButton(...)
         local ToggleOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(0, 13, 0, 13);
+            Size = UDim2.new(0, math.floor(IS_MOBILE and 22 or 13), 0, math.floor(IS_MOBILE and 22 or 13));
             ZIndex = 5;
             Parent = Container;
         });
@@ -2401,7 +2482,7 @@ end;
                     if Addon.DisplayFrame then
                         local pos = Addon.DisplayFrame.AbsolutePosition;
                         local size = Addon.DisplayFrame.AbsoluteSize;
-                        if Mouse.X >= pos.X and Mouse.X <= pos.X + size.X and Mouse.Y >= pos.Y and Mouse.Y <= pos.Y + size.Y then
+                        if InstanceGetMousePos().X >= pos.X and InstanceGetMousePos().X <= pos.X + size.X and InstanceGetMousePos().Y >= pos.Y and InstanceGetMousePos().Y <= pos.Y + size.Y then
                             dominated = true;
                             break;
                         end;
@@ -2475,7 +2556,7 @@ local Slider = {
         local SliderOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(1, -4, 0, 13);
+            Size = UDim2.new(1, -4, 0, math.floor(IS_MOBILE and 24 or 13));
             ZIndex = 5;
             Parent = Container;
         });
@@ -2606,12 +2687,12 @@ local Slider = {
 
 SliderInner.InputBegan:Connect(function(Input)
     if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and not Library:MouseIsOverOpenedFrame() then
-        local mPos = Mouse.X;
+        local mPos = InstanceGetMousePos().X;
         local gPos = Fill.Size.X.Offset;
         local Diff = mPos - (Fill.AbsolutePosition.X + gPos);
 
-        while IsPrimaryHeld() do
-            local nMPos = Mouse.X;
+        while InstanceIsPrimaryHeld() do
+            local nMPos = InstanceGetMousePos().X;
             local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, Slider.MaxSize);
 
             local nValue = Slider:GetValueFromXOffset(nX);
@@ -2846,12 +2927,12 @@ function MultiSlider:GetValueFromXOffset(X, IsMin)
 
 MinSlider.Inner.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and not Library:MouseIsOverOpenedFrame() then
-                local mPos = Mouse.X;
+                local mPos = InstanceGetMousePos().X;
                 local gPos = MinSlider.Fill.Size.X.Offset;
                 local Diff = mPos - (MinSlider.Fill.AbsolutePosition.X + gPos);
 
-                while IsPrimaryHeld() do
-                    local nMPos = Mouse.X;
+                while InstanceIsPrimaryHeld() do
+                    local nMPos = InstanceGetMousePos().X;
                     local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, MultiSlider.MinMaxSize);
 
                     local nValue = MultiSlider:GetValueFromXOffset(nX, true);
@@ -2878,12 +2959,12 @@ MinSlider.Inner.InputBegan:Connect(function(Input)
 
 MaxSlider.Inner.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and not Library:MouseIsOverOpenedFrame() then
-                local mPos = Mouse.X;
+                local mPos = InstanceGetMousePos().X;
                 local gPos = MaxSlider.Fill.Size.X.Offset;
                 local Diff = mPos - (MaxSlider.Fill.AbsolutePosition.X + gPos);
 
-                while IsPrimaryHeld() do
-                    local nMPos = Mouse.X;
+                while InstanceIsPrimaryHeld() do
+                    local nMPos = InstanceGetMousePos().X;
                     local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, MultiSlider.MaxMaxSize);
 
                     local nValue = MultiSlider:GetValueFromXOffset(nX, false);
@@ -3063,12 +3144,12 @@ MaxSlider.Inner.InputBegan:Connect(function(Input)
 
             SliderInner.InputBegan:Connect(function(Input)
                 if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and not Library:MouseIsOverOpenedFrame() then
-                    local mPos = Mouse.X;
+                    local mPos = InstanceGetMousePos().X;
                     local gPos = Fill.Size.X.Offset;
                     local Diff = mPos - (Fill.AbsolutePosition.X + gPos);
 
-                    while IsPrimaryHeld() do
-                        local nMPos = Mouse.X;
+                    while InstanceIsPrimaryHeld() do
+                        local nMPos = InstanceGetMousePos().X;
                         local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, Slider.MaxSize);
 
                         local nValue = Slider:GetValueFromXOffset(nX);
@@ -3234,7 +3315,7 @@ MaxSlider.Inner.InputBegan:Connect(function(Input)
             Library:AddToolTip(Info.Tooltip, DropdownOuter)
         end
 
-        local MAX_DROPDOWN_ITEMS = 8;
+        local MAX_DROPDOWN_ITEMS = IS_MOBILE and 6 or 8;
 
 local ListOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
@@ -3358,7 +3439,7 @@ Library:AddToRegistry(ListInner, {
                     BackgroundColor3 = Library.MainColor;
                     BorderColor3 = Library.OutlineColor;
                     BorderMode = Enum.BorderMode.Middle;
-                    Size = UDim2.new(1, -1, 0, 20);
+                    Size = UDim2.new(1, -1, 0, math.floor(IS_MOBILE and 36 or 20));
                     ZIndex = 23;
                     Active = true,
                     Parent = Scrolling;
@@ -3535,8 +3616,8 @@ end;
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
                 local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
 
-                if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
-                    or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
+                if InstanceGetMousePos().X < AbsPos.X or InstanceGetMousePos().X > AbsPos.X + AbsSize.X
+                    or InstanceGetMousePos().Y < (AbsPos.Y - 20 - 1) or InstanceGetMousePos().Y > AbsPos.Y + AbsSize.Y then
 
                     Dropdown:CloseDropdown();
                 end;
@@ -3676,7 +3757,7 @@ do
     Library.NotificationArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
         Position = UDim2.new(0, 0, 0, 40);
-        Size = UDim2.new(0, 300, 0, 200);
+        Size = UDim2.new(0, math.floor(IS_MOBILE and 250 or 300), 0, math.floor(IS_MOBILE and 160 or 200));
         ZIndex = 100;
         Parent = ScreenGui;
     });
@@ -3692,7 +3773,7 @@ do
         AnchorPoint = Vector2.new(0.5, 0);
         BorderColor3 = Color3.new(0, 0, 0);
         Position = UDim2.new(0.5, 0, 0, 10);
-        Size = UDim2.new(0, 213, 0, 20);
+        Size = UDim2.new(0, math.floor(IS_MOBILE and 280 or 213), 0, math.floor(IS_MOBILE and 28 or 20));
         ZIndex = 200;
         Visible = false;
         Parent = ScreenGui;
@@ -3757,7 +3838,7 @@ do
         AnchorPoint = Vector2.new(0, 0.5);
         BorderColor3 = Color3.new(0, 0, 0);
         Position = UDim2.new(0, 10, 0.5, 0);
-        Size = UDim2.new(0, 210, 0, 20);
+        Size = UDim2.new(0, math.floor(IS_MOBILE and 260 or 210), 0, math.floor(IS_MOBILE and 28 or 20));
         Visible = false;
         ZIndex = 100;
         Parent = ScreenGui;
@@ -3939,10 +4020,10 @@ function Library:CreateWindow(...)
 
     if type(Config.Title) ~= 'string' then Config.Title = 'No title' end
     if type(Config.TabPadding) ~= 'number' then Config.TabPadding = 0 end
-    if type(Config.MenuFadeTime) ~= 'number' then Config.MenuFadeTime = 0.2 end
+    if type(Config.MenuFadeTime) ~= 'number' then Config.MenuFadeTime = (IS_MOBILE and 0 or 0.2) end
 
     if typeof(Config.Position) ~= 'UDim2' then Config.Position = UDim2.fromOffset(175, 50) end
-    if typeof(Config.Size) ~= 'UDim2' then Config.Size = UDim2.fromOffset(700, 600) end
+    if typeof(Config.Size) ~= 'UDim2' then Config.Size = UDim2.fromOffset(math.floor(700 * MOBILE_SCALE), math.floor(600 * MOBILE_SCALE)) end
 
     if Config.Center then
         Config.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -4002,10 +4083,10 @@ local ResizeRight = Library:Create('Frame', {
 ResizeCorner.InputBegan:Connect(function(Input)
     if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
         local StartSize = Outer.AbsoluteSize;
-        local StartPos = Vector2.new(Mouse.X, Mouse.Y);
+        local StartPos = Vector2.new(InstanceGetMousePos().X, InstanceGetMousePos().Y);
 
-        while IsPrimaryHeld() do
-            local Delta = Vector2.new(Mouse.X - StartPos.X, Mouse.Y - StartPos.Y);
+        while InstanceIsPrimaryHeld() do
+            local Delta = Vector2.new(InstanceGetMousePos().X - StartPos.X, InstanceGetMousePos().Y - StartPos.Y);
             local NewSize = Vector2.new(
                 math.clamp(StartSize.X + Delta.X, MinSize.X, MaxSize.X),
                 math.clamp(StartSize.Y + Delta.Y, MinSize.Y, MaxSize.Y)
@@ -4021,10 +4102,10 @@ end);
 ResizeBottom.InputBegan:Connect(function(Input)
     if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
         local StartSize = Outer.AbsoluteSize;
-        local StartPos = Mouse.Y;
+        local StartPos = InstanceGetMousePos().Y;
 
-        while IsPrimaryHeld() do
-            local Delta = Mouse.Y - StartPos;
+        while InstanceIsPrimaryHeld() do
+            local Delta = InstanceGetMousePos().Y - StartPos;
             local NewHeight = math.clamp(StartSize.Y + Delta, MinSize.Y, MaxSize.Y);
 
             Outer.Size = UDim2.fromOffset(Outer.AbsoluteSize.X, NewHeight);
@@ -4037,10 +4118,10 @@ end);
 ResizeRight.InputBegan:Connect(function(Input)
     if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
         local StartSize = Outer.AbsoluteSize;
-        local StartPos = Mouse.X;
+        local StartPos = InstanceGetMousePos().X;
 
-        while IsPrimaryHeld() do
-            local Delta = Mouse.X - StartPos;
+        while InstanceIsPrimaryHeld() do
+            local Delta = InstanceGetMousePos().X - StartPos;
             local NewWidth = math.clamp(StartSize.X + Delta, MinSize.X, MaxSize.X);
 
             Outer.Size = UDim2.fromOffset(NewWidth, Outer.AbsoluteSize.Y);
@@ -4688,6 +4769,56 @@ end;
                 task.spawn(Library.Toggle)
             end
         end))
+
+        -- Mobile floating toggle button
+        if IS_MOBILE then
+            local _mtb = Instance.new("TextButton")
+            _mtb.Name = "MobileMenuToggle"
+            _mtb.Size = UDim2.new(0, 50, 0, 50)
+            _mtb.Position = UDim2.new(1, -60, 0, 20)
+            _mtb.BackgroundColor3 = Library.AccentColor
+            _mtb.Text = "☰"
+            _mtb.TextColor3 = Color3.new(1, 1, 1)
+            _mtb.TextSize = 24
+            _mtb.Font = Enum.Font.GothamBold
+            _mtb.BorderSizePixel = 0
+            _mtb.Parent = ScreenGui
+
+            local _mc = Instance.new("UICorner")
+            _mc.CornerRadius = UDim.new(0.5, 0)
+            _mc.Parent = _mtb
+
+            _mtb.InputBegan:Connect(function(Input)
+                if Input.UserInputType == Enum.UserInputType.Touch then
+                    task.spawn(Library.Toggle)
+                end
+            end)
+
+            local _md = false
+            local _ms = nil
+            local _mp = nil
+
+            _mtb.InputBegan:Connect(function(Input)
+                if Input.UserInputType == Enum.UserInputType.Touch then
+                    _md = true
+                    _ms = Input.Position
+                    _mp = _mtb.Position
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(Input)
+                if _md and Input.UserInputType == Enum.UserInputType.Touch then
+                    local _d = Input.Position - _ms
+                    _mtb.Position = UDim2.new(_mp.X.Scale, _mp.X.Offset + _d.X, _mp.Y.Scale, _mp.Y.Offset + _d.Y)
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(Input)
+                if Input.UserInputType == Enum.UserInputType.Touch then
+                    _md = false
+                end
+            end)
+        end
 
         if Config.AutoShow then task.spawn(Library.Toggle) end
 
@@ -5854,6 +5985,10 @@ _G.AspectRatioSettings = _G.AspectRatioSettings or {
     X = 13,
     Y = 10,
 }
+
+if IS_MOBILE then
+    _G.AspectRatioSettings.Enabled = false
+end
 
 local function getAspectStretch()
     local s = _G.AspectRatioSettings
