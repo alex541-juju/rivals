@@ -394,37 +394,59 @@ local DragPreview = Library:Create('Frame', {
         BorderColor3 = 'AccentColor';
     });
 
+    local Dragging = false;
+    local DragInput, DragStart, StartPos;
+
     Instance.InputBegan:Connect(function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
             local ObjPos = Vector2.new(
-                Mouse.X - Instance.AbsolutePosition.X,
-                Mouse.Y - Instance.AbsolutePosition.Y
+                Input.Position.X - Instance.AbsolutePosition.X,
+                Input.Position.Y - Instance.AbsolutePosition.Y
             );
 
             if ObjPos.Y > (Cutoff or 40) then
                 return;
             end;
 
-DragPreview.Size = Instance.Size;
+Dragging = true;
+            DragStart = Input.Position;
+            StartPos = Instance.Position;
+
+            DragPreview.Size = Instance.Size;
             DragPreview.Position = Instance.Position;
             DragPreview.AnchorPoint = Instance.AnchorPoint;
             DragPreview.Visible = true;
 
-            while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-                DragPreview.Position = UDim2.new(
-                    0,
-                    Mouse.X - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
-                    0,
-                    Mouse.Y - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
-                );
-
-                RenderStepped:Wait();
-            end;
-
-Instance.Position = DragPreview.Position;
-            DragPreview.Visible = false;
+local EndConn;
+            EndConn = Input.Changed:Connect(function()
+                if Input.UserInputState == Enum.UserInputState.End then
+                    Dragging = false;
+                    Instance.Position = DragPreview.Position;
+                    DragPreview.Visible = false;
+                    EndConn:Disconnect();
+                end;
+            end);
         end;
-    end)
+    end);
+
+    Instance.InputChanged:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch then
+            DragInput = Input;
+        end;
+    end);
+
+    InputService.InputChanged:Connect(function(Input)
+        if Input == DragInput and Dragging then
+            local Delta = Input.Position - DragStart;
+
+            DragPreview.Position = UDim2.new(
+                StartPos.X.Scale,
+                StartPos.X.Offset + Delta.X,
+                StartPos.Y.Scale,
+                StartPos.Y.Offset + Delta.Y
+            );
+        end;
+    end);
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
