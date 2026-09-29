@@ -1,20 +1,23 @@
+if not cloneref then
+    cloneref = function(x) return x end
+end
 
+if getgenv().elisium then
+    print(v83[98])
+    return
+end
 
-														if getgenv().elisium then
-															print(v83[98])
-															return
-														end
-														getgenv().elisium = true
+getgenv().elisium = true
 
-														if not game:IsLoaded() then
-															game.Loaded:Wait()
-														end
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
 
-														genv = getgenv()
-														genv.TargetHUDTargets = {}
+genv = getgenv()
+genv.TargetHUDTargets = {}
 
-														getgenv().Elisium = {
-															Combat = {
+getgenv().Elisium = {
+    Combat = {
 																SilentAim = {
 																	Enabled = false,
 																	[v83[83]] = {},
