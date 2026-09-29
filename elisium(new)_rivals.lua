@@ -1,6 +1,18 @@
 if not cloneref then
     cloneref = function(x) return x end
 end
+if not getrawmetatable then
+    getrawmetatable = getmetatable
+end
+if not setrawmetatable then
+    setrawmetatable = setmetatable
+end
+if not hookfunction then
+    hookfunction = function(a, b) return a end
+end
+if not newcclosure then
+    newcclosure = function(x) return x end
+end
 
 if getgenv().elisium then
     print(v83[98])
