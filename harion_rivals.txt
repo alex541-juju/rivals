@@ -2532,10 +2532,11 @@ lionGetGroup("main", "weapons", "right")
         mainapi:Uninject()
     end })
     MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
-        Default = "End",
+        Default = "LeftControl",
         NoUI = true,
         Text = "Menu keybind",
     })
+
     LionLibrary.ToggleKeybind = Options.MenuKeybind
     mainapi.ClickGuiStatus = true
     setMenuBlur(true)
