@@ -1,4 +1,31 @@
--- c0caine v1.4.1 (build 7.4.1) · licence id=51 · wm-51-1fb73d8ee0ed022c
+
+
+    local folder = "co_cfg"
+    if not isfolder(folder) then makefolder(folder) end
+
+    local realRead = readfile
+    local realWrite = writefile
+    local realIsFile = isfile
+    local realMakeFolder = makefolder
+    local realIsfolder = isfolder
+
+    -- redirect cocaine/... sang co_cfg/...
+    local function remap(p)
+        return p:gsub("^cocaine/", folder .. "/")
+    end
+
+    getgenv().readfile = function(p) return realRead(remap(p)) end
+    getgenv().writefile = function(p, d) 
+        local mapped = remap(p)
+        local dir = mapped:match("^(.+)/[^/]+$")
+        if dir and not realIsfolder(dir) then realMakeFolder(dir) end
+        return realWrite(mapped, d) 
+    end
+    getgenv().isfile = function(p) return realIsFile(remap(p)) end
+    getgenv().makefolder = function(p) return realMakeFolder(remap(p)) end
+    getgenv().isfolder = function(p) return realIsfolder(remap(p)) end
+end
+
 pcall(function() (getgenv and getgenv() or _G).CocaineEdition = "normal" end)
 --[[
     cocaine v6 · RIVALS (Volt executor)
