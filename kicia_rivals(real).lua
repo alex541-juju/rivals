@@ -26,7 +26,15 @@ function K.fn(name)
     local v
     pcall(function() v = getfenv(0)[name] end)
     if type(v) ~= "function" then pcall(function() v = getfenv()[name] end) end
+    if type(v) ~= "function" then pcall(function() v = getgenv()[name] end) end
     return type(v) == "function" and v or nil
+end
+
+-- ensure file APIs in global scope
+for _, name in ipairs({"isfolder","makefolder","isfile","writefile","readfile","listfiles","appendfile"}) do
+    if not getfenv(0)[name] and type(getgenv()[name]) == "function" then
+        getfenv(0)[name] = getgenv()[name]
+    end
 end
 
 local getthreadidentity_ = K.fn("getthreadidentity") or K.fn("getidentity")
