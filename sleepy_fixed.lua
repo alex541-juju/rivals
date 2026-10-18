@@ -3632,11 +3632,11 @@ do
     
     -- Library element functions
         function library:window(properties)
-            -- [MOBILE] Auto-fit window to mobile viewport
+            -- [MOBILE FIX] Auto-fit window to mobile viewport - tighter sizing
             local default_size = dim2(0, 780, 0, 505)
             if is_mobile then
-                local w = clamp(viewport_size.X * 0.94, 320, 700)
-                local h = clamp(viewport_size.Y * 0.82, 340, 505)
+                local w = clamp(viewport_size.X * 0.98, 300, viewport_size.X - 4)
+                local h = clamp(viewport_size.Y * 0.72, 300, viewport_size.Y - 80)
                 default_size = dim2(0, w, 0, h)
             end
 
@@ -3885,7 +3885,78 @@ do
 
             function cfg.toggle_menu(bool) 
                 library[ "items" ].Enabled = bool
-            end 
+            end
+
+            -- [MOBILE FIX] Thêm nút toggle cho mobile
+            if is_mobile then
+                local uis2 = game:GetService("UserInputService")
+                local coregui2 = game:GetService("CoreGui")
+
+                local mobileGui = library:create("ScreenGui", {
+                    Parent = coregui2,
+                    Name = "SleepyMobileToggle",
+                    ZIndexBehavior = Enum.ZIndexBehavior.Global,
+                    IgnoreGuiInset = true,
+                    ResetOnSpawn = false,
+                })
+
+                local btn = library:create("TextButton", {
+                    Parent = mobileGui,
+                    Size = dim2(0, 44, 0, 44),
+                    Position = dim2(0, 8, 0.5, -22),
+                    BackgroundColor3 = rgb(15, 15, 20),
+                    TextColor3 = rgb(0, 162, 255),
+                    Text = "☰",
+                    TextSize = 20,
+                    BorderSizePixel = 0,
+                    ZIndex = 9999,
+                    Active = true,
+                    AutoButtonColor = false,
+                })
+                library:create("UICorner", { Parent = btn, CornerRadius = dim(0, 8) })
+                library:create("UIStroke", { Parent = btn, Color = rgb(23, 23, 29), Thickness = 1 })
+
+                -- drag nút
+                local btnDragging, btnStart, btnStartPos = false, nil, nil
+                btn.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.Touch then
+                        btnDragging = true
+                        btnStart = input.Position
+                        btnStartPos = btn.Position
+                    end
+                end)
+                uis2.InputChanged:Connect(function(input)
+                    if btnDragging and input.UserInputType == Enum.UserInputType.Touch then
+                        local delta = input.Position - btnStart
+                        local nx = clamp(btnStartPos.X.Offset + delta.X, 0, viewport_size.X - 48)
+                        local ny = clamp(btnStartPos.Y.Offset + delta.Y, 0, viewport_size.Y - 48)
+                        btn.Position = dim2(0, nx, 0, ny)
+                    end
+                end)
+                uis2.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.Touch then
+                        btnDragging = false
+                    end
+                end)
+
+                -- tap toggle (chỉ toggle khi không drag)
+                local tapStart = nil
+                btn.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.Touch then
+                        tapStart = input.Position
+                    end
+                end)
+                btn.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.Touch and tapStart then
+                        local dist = (input.Position - tapStart).Magnitude
+                        if dist < 8 then -- tap, not drag
+                            getgenv()._sleepyMenuOpen = not getgenv()._sleepyMenuOpen
+                            cfg.toggle_menu(getgenv()._sleepyMenuOpen)
+                        end
+                        tapStart = nil
+                    end
+                end)
+            end
 
             return setmetatable(cfg, library)
         end 
